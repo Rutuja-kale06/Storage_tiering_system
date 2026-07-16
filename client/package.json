@@ -1,0 +1,31 @@
+{
+  "name": "storage-tiering-client",
+  "version": "2.0.0",
+  "description": "Desktop client for Auto Storage Tiering System",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.storagetiering.client",
+    "productName": "Storage Tiering Client",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

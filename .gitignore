@@ -1,0 +1,36 @@
+# Build directories and files
+build/
+*.obj
+*.exe
+*.bin
+*.lib
+*.dll
+*.exp
+CMakeCache.txt
+CMakeFiles/
+.ninja_*
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Environment and secrets
+.env
+.env.local
+config/*.json
+!config/tiering_config.json.example
+
+# Desktop client
+client/node_modules/
+client/dist/
+client/out/
+client/.env

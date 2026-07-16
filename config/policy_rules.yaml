@@ -1,0 +1,48 @@
+lifecycle_rules:
+  # Archive logs older than 1 year
+  - id: "archive-old-logs"
+    filter:
+      file_type: [2]        # LOGS
+      older_than_days: 365
+    action: migrate_to(ARCHIVE)
+    priority: 10
+
+  # Delete temp files older than 7 days
+  - id: "delete-old-temp"
+    filter:
+      file_type: [7]        # TEMPORARY
+      older_than_days: 7
+    action: delete()
+    priority: 5
+
+  # Pin databases to HOT always
+  - id: "protect-databases"
+    filter:
+      file_type: [0]        # DATABASE
+    action: pin(HOT)
+    priority: 100
+
+  # Move large backups (>1GB) older than 30 days to COLD
+  - id: "archive-large-backups"
+    filter:
+      file_type: [5]        # BACKUP
+      older_than_days: 30
+      larger_than_bytes: 1073741824  # 1GB
+    action: migrate_to(COLD)
+    priority: 20
+
+  # Archive media not accessed in 90 days
+  - id: "cold-media"
+    filter:
+      file_type: [3]        # MEDIA
+      older_than_days: 90
+    action: migrate_to(COLD)
+    priority: 15
+
+  # Delete lock/tmp files in /tmp/ paths
+  - id: "clean-tmp"
+    filter:
+      path_patterns: ["/tmp/**", "**/temp/**"]
+      older_than_days: 1
+    action: delete()
+    priority: 50

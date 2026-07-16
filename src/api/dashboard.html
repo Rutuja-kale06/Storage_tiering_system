@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storage Tiering Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         background: #0f0f1a; color: #c8d6e5; padding: 20px; }
+  h1 { color: #00d4ff; font-size: 22px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  h2 { color: #b0c4de; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-dot.online { background: #2ecc71; }
+  .status-dot.offline { background: #e74c3c; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tab { padding: 8px 18px; border-radius: 6px 6px 0 0; font-size: 13px; font-weight: 600;
+         cursor: pointer; background: #1a1a2e; color: #667; border: 1px solid #2a2a4a; border-bottom: none; }
+  .tab.active { background: #1a1a2e; color: #00d4ff; border-color: #00d4ff44; }
+  .tab:hover { color: #b0c4de; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .auth-container { max-width: 400px; margin: 60px auto; }
+  .auth-box { background: #1a1a2e; border-radius: 12px; padding: 32px; border: 1px solid #2a2a4a; }
+  .auth-title { text-align: center; color: #00d4ff; font-size: 20px; margin-bottom: 24px; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; }
+  .auth-toggle a { color: #00d4ff; cursor: pointer; text-decoration: none; }
+  .auth-toggle a:hover { text-decoration: underline; }
+  .auth-error { background: #e74c3c22; color: #e74c3c; border: 1px solid #e74c3c44; border-radius: 6px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; color: #667; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input { width: 100%; padding: 10px 12px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 6px; color: #c8d6e5; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .form-group input:focus { border-color: #00d4ff; }
+  .form-group input::placeholder { color: #445; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: #1a1a2e; border-radius: 10px; padding: 16px; border: 1px solid #2a2a4a; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .tier-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .tier-hot { background: #e74c3c22; color: #e74c3c; border: 1px solid #e74c3c44; }
+  .tier-warm { background: #f39c1222; color: #f39c12; border: 1px solid #f39c1244; }
+  .tier-cold { background: #3498db22; color: #3498db; border: 1px solid #3498db44; }
+  .tier-archive { background: #9b59b622; color: #9b59b6; border: 1px solid #9b59b644; }
+  .stat-value { font-size: 24px; font-weight: 700; color: #fff; }
+  .stat-label { font-size: 11px; color: #667; margin-top: 2px; }
+  .bar-bg { height: 4px; background: #2a2a4a; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 6px; color: #667; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #2a2a4a; }
+  td { padding: 8px 6px; border-bottom: 1px solid #1a1a2e; color: #c8d6e5; }
+  tr:hover td { background: #1f1f35; }
+  .btn { padding: 8px 18px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-block { width: 100%; justify-content: center; }
+  .btn-primary { background: #00d4ff; color: #0f0f1a; }
+  .btn-primary:hover { background: #00b8e6; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-outline { background: transparent; color: #00d4ff; border: 1px solid #00d4ff44; }
+  .btn-outline:hover { background: #00d4ff11; }
+  .btn-danger { background: transparent; color: #e74c3c; border: 1px solid #e74c3c44; }
+  .btn-danger:hover { background: #e74c3c11; }
+  .green { color: #2ecc71; }
+  .red { color: #e74c3c; }
+  .dim { color: #667; }
+  .flex { display: flex; align-items: center; gap: 8px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .gap { gap: 12px; }
+  .mt { margin-top: 12px; }
+  .mb { margin-bottom: 12px; }
+  .chart-container { position: relative; height: 300px; width: 100%; }
+  .drive-card { margin-bottom: 8px; }
+  .drive-type-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+  .drive-type-ssd { background: #e74c3c22; color: #e74c3c; border: 1px solid #e74c3c44; }
+  .drive-type-hdd { background: #f39c1222; color: #f39c12; border: 1px solid #f39c1244; }
+  .drive-type-usb { background: #3498db22; color: #3498db; border: 1px solid #3498db44; }
+  .drive-type-remote { background: #9b59b622; color: #9b59b6; border: 1px solid #9b59b644; }
+  .user-badge { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 20px; background: #1a1a2e; border: 1px solid #2a2a4a; font-size: 12px; }
+  .user-avatar { width: 26px; height: 26px; border-radius: 50%; background: #00d4ff22; color: #00d4ff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .role-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .role-admin { background: #f39c1222; color: #f39c12; border: 1px solid #f39c1244; }
+  .role-user { background: #00d4ff22; color: #00d4ff; border: 1px solid #00d4ff44; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0f0f1a; }
+  ::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 9999; animation: slideIn 0.3s ease; }
+  .toast-success { background: #2ecc7122; color: #2ecc71; border: 1px solid #2ecc7144; }
+  .toast-error { background: #e74c3c22; color: #e74c3c; border: 1px solid #e74c3c44; }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @media (max-width: 600px) {
+    body { padding: 10px; }
+    .grid { grid-template-columns: 1fr 1fr; }
+    .stat-value { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="auth-container">
+  <div class="auth-box">
+    <div class="auth-title">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2" style="vertical-align:middle;margin-right:8px;">
+        <rect x="2" y="2" width="20" height="8" rx="2"/>
+        <rect x="2" y="14" width="20" height="8" rx="2"/>
+        <path d="M6 6h12M6 18h12"/>
+      </svg>
+      Storage Tiering
+    </div>
+    <div id="authError" class="auth-error"></div>
+    <div id="loginForm">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="loginUsername" placeholder="Enter username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="doLogin()" id="loginBtn">Sign In</button>
+      <div class="auth-toggle">Don't have an account? <a onclick="showRegister()">Register</a></div>
+    </div>
+    <div id="registerForm" style="display:none;">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="regUsername" placeholder="Choose a username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="regDisplayName" placeholder="Your display name">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPassword" placeholder="Choose a password" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="doRegister()" id="regBtn">Create Account</button>
+      <div class="auth-toggle">Already have an account? <a onclick="showLogin()">Sign In</a></div>
+    </div>
+  </div>
+</div>
+
+<div id="dashScreen" style="display:none;">
+<div class="header">
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2">
+      <rect x="2" y="2" width="20" height="8" rx="2"/>
+      <rect x="2" y="14" width="20" height="8" rx="2"/>
+      <path d="M6 6h12M6 18h12"/>
+    </svg>
+    Storage Tiering
+    <span style="font-size:12px;font-weight:400;"><span class="status-dot online" id="statusDot"></span><span id="statusText">Connected</span></span>
+  </h1>
+  <div class="flex gap" style="flex-wrap:wrap;">
+    <div class="user-badge">
+      <div class="user-avatar" id="userAvatar">A</div>
+      <span id="userDisplayName">User</span>
+      <span class="role-badge role-user" id="userRoleBadge">user</span>
+      <button class="btn btn-sm btn-outline" onclick="doLogout()" title="Sign out" style="margin-left:4px;">Sign Out</button>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="runCycle()" id="cycleBtn">Run Cycle</button>
+    <button class="btn btn-outline btn-sm" onclick="refreshAll()">Refresh</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')" id="tab-overview">Overview</div>
+  <div class="tab" onclick="switchTab('drives')" id="tab-drives">Drives</div>
+  <div class="tab" onclick="switchTab('admin')" id="tab-admin" style="display:none;">Admin</div>
+</div>
+
+<div class="panel active" id="panel-overview">
+  <div class="grid" id="tierCards"></div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;">
+    <div class="card"><h2>Cost &amp; Savings</h2>
+      <div id="savingsContent">
+        <div class="stat-value" id="monthlyCost">--</div>
+        <div class="stat-label">Monthly cost</div>
+        <div class="mt" id="savingsDetails"></div>
+      </div>
+    </div>
+    <div class="card"><h2>System Status</h2>
+      <div id="systemStatus">
+        <div class="flex-between"><span class="dim">Engine</span><span id="engineState">--</span></div>
+        <div class="flex-between mt"><span class="dim">Files managed</span><span id="fileCount">--</span></div>
+        <div class="flex-between mt"><span class="dim">Total size</span><span id="totalSize">--</span></div>
+        <div class="flex-between mt"><span class="dim">Cycles run</span><span id="cycleCount">--</span></div>
+        <div class="flex-between mt"><span class="dim">Migrations</span><span id="migrationCount">--</span></div>
+        <div class="flex-between mt"><span class="dim">Bytes migrated</span><span id="bytesMigrated">--</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card mt">
+    <h2>Storage Drives</h2>
+    <div id="overviewDriveList"></div>
+    <div id="noOverviewDrives" class="dim" style="text-align:center;padding:20px;">No drives detected</div>
+  </div>
+  <div class="card mt">
+    <h2>Recent Migrations</h2>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>Time</th><th>File</th><th>From</th><th>To</th><th>Size</th><th>Status</th></tr></thead>
+        <tbody id="migrationTable"></tbody>
+      </table>
+    </div>
+    <div id="noMigrations" class="dim" style="text-align:center;padding:20px;">No migrations yet</div>
+  </div>
+</div>
+
+<div class="panel" id="panel-drives">
+  <div id="driveList"></div>
+  <div id="noDrives" class="card dim" style="text-align:center;padding:40px;">No drives detected</div>
+  <div class="card mt">
+    <h2>Storage Usage by Drive</h2>
+    <div class="chart-container">
+      <canvas id="driveChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panel-admin">
+  <div class="card">
+    <h2>User Management</h2>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>Username</th><th>Display Name</th><th>Role</th><th>Created</th><th>Last Login</th><th>Actions</th></tr></thead>
+        <tbody id="userTable"></tbody>
+      </table>
+    </div>
+    <div id="noUsers" class="dim" style="text-align:center;padding:20px;">No users found</div>
+  </div>
+</div>
+</div>
+
+<script>
+const BASE = '';
+let refreshTimer = null;
+const REFRESH_MS = 5000;
+let driveChartInstance = null;
+let currentUser = null;
+
+function getToken() { return localStorage.getItem('tiering_token'); }
+function setToken(t) { if (t) localStorage.setItem('tiering_token', t); else localStorage.removeItem('tiering_token'); }
+
+async function api(path, opts) {
+  opts = opts || {};
+  var headers = opts.headers || {};
+  var token = getToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  try {
+    var r = await fetch(BASE + path, { method: opts.method || 'GET', headers: headers, body: opts.body || null });
+    if (r.status === 401) {
+      setToken(null);
+      showAuthScreen();
+      return null;
+    }
+    if (!r.ok) {
+      var errData = null;
+      try { errData = await r.json(); } catch(e) {}
+      var msg = (errData && errData.error) ? errData.error : 'Request failed (' + r.status + ')';
+      showToast(msg, 'error');
+      return null;
+    }
+    var ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return await r.json();
+    return await r.text();
+  } catch(e) {
+    if (document.getElementById('dashScreen').style.display !== 'none') {
+      document.getElementById('statusDot').className='status-dot offline';
+      document.getElementById('statusText').textContent='Disconnected';
+    }
+    return null;
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById('authScreen').style.display = 'block';
+  document.getElementById('dashScreen').style.display = 'none';
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  setToken(null);
+}
+
+function showDashboard(user) {
+  currentUser = user;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('dashScreen').style.display = 'block';
+  var avatar = document.getElementById('userAvatar');
+  var name = (user.display_name || user.username || 'User');
+  avatar.textContent = name.charAt(0).toUpperCase();
+  document.getElementById('userDisplayName').textContent = name;
+  var roleBadge = document.getElementById('userRoleBadge');
+  roleBadge.textContent = user.role || 'user';
+  roleBadge.className = 'role-badge role-' + (user.role || 'user');
+  var adminTab = document.getElementById('tab-admin');
+  adminTab.style.display = (user.role === 'admin') ? 'inline-block' : 'none';
+  document.getElementById('statusDot').className = 'status-dot online';
+  document.getElementById('statusText').textContent = 'Connected';
+  startAutoRefresh();
+}
+
+function showLogin() {
+  document.getElementById('loginForm').style.display = 'block';
+  document.getElementById('registerForm').style.display = 'none';
+  document.getElementById('authError').style.display = 'none';
+}
+
+function showRegister() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('registerForm').style.display = 'block';
+  document.getElementById('authError').style.display = 'none';
+}
+
+function showAuthError(msg) {
+  var el = document.getElementById('authError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function doLogin() {
+  var username = document.getElementById('loginUsername').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  if (!username || !password) { showAuthError('Please fill in all fields'); return; }
+  var btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  var data = await api('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: username, password: password }) });
+  if (data && data.token) {
+    setToken(data.token);
+    showDashboard(data.user);
+    refreshAll();
+  }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+
+async function doRegister() {
+  var username = document.getElementById('regUsername').value.trim();
+  var displayName = document.getElementById('regDisplayName').value.trim();
+  var password = document.getElementById('regPassword').value;
+  if (!username || !password) { showAuthError('Please fill in all fields'); return; }
+  var btn = document.getElementById('regBtn');
+  btn.disabled = true; btn.textContent = 'Creating account...';
+  var data = await api('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: username, password: password, display_name: displayName || username }) });
+  if (data && data.token) {
+    setToken(data.token);
+    showDashboard(data.user);
+    refreshAll();
+  }
+  btn.disabled = false; btn.textContent = 'Create Account';
+}
+
+function doLogout() {
+  setToken(null);
+  showAuthScreen();
+  showToast('Signed out', 'success');
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'drives') loadDrives();
+  if (name === 'admin') loadUsers();
+}
+
+async function runCycle() {
+  var btn = document.getElementById('cycleBtn');
+  btn.disabled = true; btn.textContent = 'Running...';
+  var r = await api('/api/v1/cycle', { method: 'POST' });
+  if (r) { btn.textContent = 'Run Cycle'; refreshAll(); showToast('Migration cycle completed', 'success'); }
+  btn.disabled = false; btn.textContent = 'Run Cycle';
+}
+
+function renderTiers(data) {
+  var c = document.getElementById('tierCards');
+  if (!data || !data.tiers) { c.innerHTML = '<div class="card dim">No data</div>'; return; }
+  var total = data.tiers.reduce(function(s, t) { return s + t.total_bytes; }, 0) || 1;
+  c.innerHTML = data.tiers.map(function(t) {
+    var cls = t.tier.toLowerCase();
+    var pct = (t.total_bytes / total * 100).toFixed(1);
+    var gb = (t.total_bytes / 1e9).toFixed(1);
+    var colors = { hot: '#e74c3c', warm: '#f39c12', cold: '#3498db', archive: '#9b59b6' };
+    return '<div class="card"><div class="card-header"><span class="tier-badge tier-' + cls + '">' + t.tier + '</span><span class="dim">' + t.file_count + ' files</span></div><div class="stat-value">' + gb + ' <span class="dim" style="font-size:14px;font-weight:400;">GB</span></div><div class="stat-label">$' + (t.monthly_cost || 0).toFixed(2) + '/mo</div><div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%;background:' + (colors[cls] || '#667') + '"></div></div><div class="dim" style="font-size:11px;margin-top:4px;text-align:right;">' + pct + '%</div></div>';
+  }).join('');
+}
+
+function renderSavings(data) {
+  if (!data || data.current_monthly_cost === undefined) return;
+  document.getElementById('monthlyCost').textContent = '$' + data.current_monthly_cost.toFixed(2);
+  document.getElementById('savingsDetails').innerHTML = '<div class="green" style="font-size:20px;font-weight:700;">Savings: $' + (data.savings_vs_all_hot || 0).toFixed(2) + '/mo (' + (data.savings_percent || 0).toFixed(1) + '%)</div><div class="dim" style="font-size:13px;margin-top:4px;">Projected annual: $' + (data.projected_annual_savings || 0).toFixed(2) + '</div>';
+}
+
+function renderStatus(engine, tiers) {
+  if (engine) {
+    document.getElementById('engineState').textContent = engine.state || '--';
+    document.getElementById('cycleCount').textContent = engine.cycle_count || 0;
+    document.getElementById('migrationCount').textContent = engine.total_migrations || 0;
+    document.getElementById('bytesMigrated').textContent = formatBytes(engine.total_bytes_migrated || 0);
+  }
+  if (tiers && tiers.tiers) {
+    var tf = tiers.tiers.reduce(function(s, t) { return s + t.file_count; }, 0);
+    var tb = tiers.tiers.reduce(function(s, t) { return s + t.total_bytes; }, 0);
+    document.getElementById('fileCount').textContent = tf;
+    document.getElementById('totalSize').textContent = ((tb || 0) / (1 << 30)).toFixed(1) + ' GB';
+  }
+}
+
+function renderMigrations(data) {
+  var tb = document.getElementById('migrationTable');
+  var em = document.getElementById('noMigrations');
+  if (!data || !data.migrations || !data.migrations.length) { tb.innerHTML = ''; em.style.display = 'block'; return; }
+  em.style.display = 'none';
+  tb.innerHTML = data.migrations.slice(-10).reverse().map(function(m) {
+    return '<tr><td class="dim">' + (m.timestamp || '--') + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (m.file_path || m.file_id || '--') + '</td><td><span class="tier-badge tier-' + (m.from_tier || '').toLowerCase() + '">' + (m.from_tier || '--') + '</span></td><td><span class="tier-badge tier-' + (m.to_tier || '').toLowerCase() + '">' + (m.to_tier || '--') + '</span></td><td>' + ((m.size_bytes || 0) / (1 << 20)).toFixed(1) + ' MB</td><td class="' + (m.success ? 'green' : 'red') + '">' + (m.success ? 'OK' : 'FAIL') + '</td></tr>';
+  }).join('');
+}
+
+async function loadDrives() {
+  var data = await api('/api/v1/drives');
+  var div = document.getElementById('driveList');
+  var empty = document.getElementById('noDrives');
+  if (!data || !data.drives || !data.drives.length) {
+    div.innerHTML = ''; empty.style.display = 'block';
+    if (driveChartInstance) { driveChartInstance.destroy(); driveChartInstance = null; }
+    return;
+  }
+  empty.style.display = 'none';
+  div.innerHTML = data.drives.map(function(d) {
+    var hw = (d.hardware_name || '').toLowerCase();
+    var pct = d.usage_pct.toFixed(1);
+    var used = formatBytes(d.used_bytes);
+    var total = formatBytes(d.total_bytes);
+    var barColors = { ssd: '#e74c3c', hdd: '#f39c12', usb: '#3498db', remote: '#9b59b6' };
+    return '<div class="card drive-card"><div class="flex-between"><div class="flex">'
+      + '<span class="drive-type-badge drive-type-' + hw + '">' + d.hardware_name + '</span>'
+      + '<span style="margin-left:8px;font-weight:600;">' + d.label + '</span>'
+      + '<span class="dim" style="margin-left:4px;">(' + d.mount_point + ')</span>'
+      + '</div><span class="tier-badge tier-' + (d.storage_class || d.tier || '?').toLowerCase() + '">' + (d.storage_class || d.tier || '?') + '</span></div>'
+      + '<div class="flex-between mt"><span class="dim">' + used + ' / ' + total + '</span><span style="font-weight:600;">' + pct + '%</span></div>'
+      + '<div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%;background:' + (barColors[hw] || '#667') + '"></div></div>'
+      + '</div>';
+  }).join('');
+  var ctx = document.getElementById('driveChart').getContext('2d');
+  if (driveChartInstance) driveChartInstance.destroy();
+  driveChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.drives.map(function(d) { return d.label + ' (' + d.mount_point + ')'; }),
+      datasets: [
+        { label: 'Used', data: data.drives.map(function(d) { return d.used_bytes; }), backgroundColor: '#e74c3c', borderRadius: 4 },
+        { label: 'Free', data: data.drives.map(function(d) { return d.free_bytes; }), backgroundColor: '#2ecc71', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#c8d6e5', font: { size: 12 } } } },
+      scales: {
+        x: { ticks: { color: '#667', font: { size: 11 } }, grid: { color: '#2a2a4a' } },
+        y: { beginAtZero: true, ticks: { color: '#667', callback: function(v) { return formatBytes(v); } }, grid: { color: '#2a2a4a' } }
+      }
+    }
+  });
+}
+
+async function loadUsers() {
+  var data = await api('/api/v1/auth/users');
+  var tb = document.getElementById('userTable');
+  var em = document.getElementById('noUsers');
+  if (!data || !data.users || !data.users.length) { tb.innerHTML = ''; em.style.display = 'block'; return; }
+  em.style.display = 'none';
+  tb.innerHTML = data.users.map(function(u) {
+    var isSelf = (currentUser && u.id === currentUser.id);
+    var delBtn = isSelf ? '<span class="dim">(you)</span>' : '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\')">Delete</button>';
+    return '<tr><td>' + u.username + '</td><td>' + (u.display_name || '--') + '</td><td><span class="role-badge role-' + u.role + '">' + u.role + '</span></td><td class="dim">' + (u.created_at || '--') + '</td><td class="dim">' + (u.last_login || '--') + '</td><td>' + delBtn + '</td></tr>';
+  }).join('');
+}
+
+async function deleteUser(userId) {
+  if (!confirm('Delete this user?')) return;
+  await api('/api/v1/auth/users/' + encodeURIComponent(userId), { method: 'DELETE' });
+  loadUsers();
+  showToast('User deleted', 'success');
+}
+
+function formatBytes(b) {
+  if (!b) return '0 B';
+  var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  var v = b, i = 0;
+  while (v >= 1024 && i < 4) { v /= 1024; i++; }
+  return v.toFixed(1) + ' ' + units[i];
+}
+
+function showToast(msg, type) {
+  type = type || 'success';
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3000);
+}
+
+function renderOverviewDrives(data) {
+  var div = document.getElementById('overviewDriveList');
+  var empty = document.getElementById('noOverviewDrives');
+  if (!data || !data.drives || !data.drives.length) {
+    div.innerHTML = ''; empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  div.innerHTML = data.drives.map(function(d) {
+    var hw = (d.hardware_name || '').toLowerCase();
+    var pct = d.usage_pct.toFixed(1);
+    var used = formatBytes(d.used_bytes);
+    var total = formatBytes(d.total_bytes);
+    var sc = (d.storage_class || d.tier || '?').toLowerCase();
+    return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      + '<span class="drive-type-badge drive-type-' + hw + '">' + d.hardware_name + '</span>'
+      + '<span style="font-weight:600;">' + d.label + '</span>'
+      + '<span class="dim">(' + d.mount_point + ')</span>'
+      + '<span class="tier-badge tier-' + sc + '">' + (d.storage_class || d.tier) + '</span>'
+      + '<span style="margin-left:auto;">' + used + ' / ' + total + ' (' + pct + '%)</span>'
+      + '</div>';
+  }).join('');
+}
+
+async function refreshAll() {
+  var p = await Promise.all([api('/api/v1/tiers'), api('/api/v1/savings'), api('/api/v1/cycle/history?n=20'), api('/api/v1/engine'), api('/api/v1/drives')]);
+  renderTiers(p[0]); renderSavings(p[1]); renderMigrations(p[2]); renderStatus(p[3], p[0]); renderOverviewDrives(p[4]);
+  if (document.getElementById('panel-drives').classList.contains('active')) loadDrives();
+}
+
+function startAutoRefresh() {
+  refreshAll();
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshAll, REFRESH_MS);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var token = getToken();
+  if (token) {
+    api('/api/v1/auth/me').then(function(data) {
+      if (data && data.user) { showDashboard(data.user); refreshAll(); }
+      else { showAuthScreen(); }
+    });
+  } else {
+    showAuthScreen();
+  }
+  document.getElementById('loginUsername').addEventListener('keypress', function(e) { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginPassword').addEventListener('keypress', function(e) { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('regUsername').addEventListener('keypress', function(e) { if (e.key === 'Enter') doRegister(); });
+  document.getElementById('regPassword').addEventListener('keypress', function(e) { if (e.key === 'Enter') doRegister(); });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "users": [
+    {
+      "created_at": 1784204416,
+      "display_name": "Administrator",
+      "id": "7aoMGx1wO8Yzpepz3-hQYA",
+      "last_login": 0,
+      "password_hash": "5b6VJm04Ae8-zwEhSYpJMA:10000:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "role": "admin",
+      "username": "admin"
+    },
+    {
+      "created_at": 1784240550,
+      "display_name": "Prasad",
+      "id": "4eNUcOaRlSRjZgJq42heKg",
+      "last_login": 0,
+      "password_hash": "H-CLGVUB8v3tHziHDeJTlg:10000:dKE8cDqHP4FIWaS5NXvxAuMEDgaBdgCkujoBjMBTKHo",
+      "role": "user",
+      "username": "prasad"
+    },
+    {
+      "created_at": 1784240550,
+      "display_name": "Rutuja",
+      "id": "ZtxtmCcoUMlp7Kka65G22A",
+      "last_login": 0,
+      "password_hash": "qBzIhypLmHmoh6g2kbX42w:10000:_meBX6MXng9cc8DYLZ8oHxvYH97eGmvCzxsyNkSdn9U",
+      "role": "user",
+      "username": "rutuja"
+    }
+  ]
+}

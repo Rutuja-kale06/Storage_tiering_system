@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src *; img-src 'self' data:;">
+  <title>Storage Tiering Client</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">⛁</span>
+          <div class="logo-text">
+            <strong>Storage Tiering</strong>
+            <small>v2.0 Client</small>
+          </div>
+        </div>
+        <div id="status-badge" class="status-badge status-unknown">● Unknown</div>
+      </div>
+      <nav id="nav">
+        <button class="nav-btn active" data-tab="overview">📊 Overview</button>
+        <button class="nav-btn" data-tab="files">📁 Files</button>
+        <button class="nav-btn" data-tab="history">📋 History</button>
+        <button class="nav-btn" data-tab="drives">💾 Drives</button>
+        <button class="nav-btn" data-tab="settings">⚙️ Settings</button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="btn-cycle" class="btn btn-primary" onclick="runCycle()">▶ Run Cycle</button>
+        <button id="btn-scan" class="btn btn-outline" onclick="runScan()">🔍 Scan Files</button>
+        <button id="btn-refresh" class="btn btn-outline" onclick="refreshAll()">↻ Refresh</button>
+      </div>
+    </aside>
+
+    <main id="main">
+      <!-- Overview Tab -->
+      <section id="tab-overview" class="tab-content active">
+        <h1>Overview</h1>
+        <div id="tier-cards" class="tier-grid"></div>
+        <div class="metrics-grid">
+          <div class="card" id="cost-card">
+            <h3>Cost & Savings</h3>
+            <div id="cost-content"><p class="loading">Loading...</p></div>
+          </div>
+          <div class="card" id="status-card">
+            <h3>System Status</h3>
+            <div id="status-content"><p class="loading">Loading...</p></div>
+          </div>
+        </div>
+        <div class="card" id="recent-migrations-card">
+          <h3>Recent Migrations</h3>
+          <div id="recent-migrations"><p class="loading">Loading...</p></div>
+        </div>
+      </section>
+
+      <!-- Files Tab -->
+      <section id="tab-files" class="tab-content">
+        <h1>Files</h1>
+        <div class="toolbar">
+          <input type="text" id="file-search" placeholder="Search files..." oninput="filterFiles()">
+          <select id="tier-filter" onchange="filterFiles()">
+            <option value="">All Tiers</option>
+            <option value="0">HOT</option>
+            <option value="1">WARM</option>
+            <option value="2">COLD</option>
+            <option value="3">ARCHIVE</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table id="files-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Tier</th>
+                <th>Size</th>
+                <th>Score</th>
+                <th>Accesses</th>
+                <th>Idle</th>
+                <th>Type</th>
+                <th>Cost/mo</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="files-body"><tr><td colspan="9" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- History Tab -->
+      <section id="tab-history" class="tab-content">
+        <h1>Migration History</h1>
+        <div class="table-wrapper">
+          <table id="history-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>File</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Size</th>
+                <th>Reason</th>
+                <th>Duration</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"><tr><td colspan="8" class="loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Drives Tab -->
+      <section id="tab-drives" class="tab-content">
+        <h1>Drives</h1>
+        <div id="drives-grid" class="drives-grid"><p class="loading">Loading...</p></div>
+      </section>
+
+      <!-- Settings Tab -->
+      <section id="tab-settings" class="tab-content">
+        <h1>Settings</h1>
+        <div class="card">
+          <div class="form-group">
+            <label for="server-url">Server URL</label>
+            <input type="text" id="server-url" placeholder="http://localhost:3000">
+          </div>
+          <div class="form-group">
+            <label for="api-key">API Key</label>
+            <input type="password" id="api-key" placeholder="Leave blank if no auth">
+          </div>
+          <div class="form-group">
+            <label for="refresh-interval">Refresh Interval (seconds)</label>
+            <input type="number" id="refresh-interval" min="1" max="60" value="5">
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+          <span id="settings-status" class="settings-status"></span>
+        </div>
+        <div class="card">
+          <h3>About</h3>
+          <p><strong>Auto Storage Tiering System</strong> v2.0</p>
+          <p>Desktop client for monitoring and managing storage tiers.</p>
+          <p class="dim">Connected to: <span id="about-server">not configured</span></p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
